@@ -1,0 +1,181 @@
+<html>
+    <head>
+        <title>Updogs</title>
+        <link rel="stylesheet" href="/static/css/flatpickr.min.css">
+        <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    </head>
+<body>
+    <div class="mb">
+        <h1>Updogs</h1>
+        <p>Simple web app to track your pushups and pullups.</p>
+        <form id="submission">
+            <div class="formControl">
+                <label for="date">Date:</label>
+                <input name="date" type="datetime-local" id="date">
+            </div>
+            <div class="formControl">
+                <label for="clean">Cleans:</label>
+                <input name="clean" type="number" value="0">
+            </div>
+            <div class="formControl">
+                <label for="negative">Negatives:</label>
+                <input name="negative" type="number" value="0">
+            </div>
+            <div class="formControl">
+                <label for="pushup">Pushups:</label>
+                <input name="pushup" type="number" value="0">
+            </div>
+            <button type="submit">Send</button>
+            <span id="errorMsg" style="color: red;"></span>
+        </form>
+    </div>
+    <div class="mb">
+        <h2>History</h2>
+        {% if pullups %}
+            <a href="#" id="deleteData"><button>Delete Data</button></a>
+            <canvas id="cleanChart" width="300" height="70"></canvas>
+            <canvas id="negChart" width="300" height="70"></canvas>
+            <canvas id="pushChart" width="300" height="70"></canvas>
+            <hr>
+            <ul>
+                {% for pullup in pullups %}
+                    <li>{{ pullup.date }} - cleans: {{ pullup.clean }}, negatives: {{ pullup.negative }}, pushups: {{ pullup.pushup }}</li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>Nothing has been entered yet. Use the form above to enter data or click here to generate dummy data.</p>
+            <a href="#" id="generateData"><button>Generate</button></a>
+        {% endif %}
+    </div>
+
+    <style>
+        #errorMsg {
+            color: red;
+        }
+        .formControl {
+            display: block;
+            padding-bottom: 1em;
+        }
+        canvas {
+            padding-bottom: 2em;
+        }
+        .mb {
+            margin-bottom: 2em;
+        }
+    </style>
+    
+    {% if pullups %}
+    <script src="/static/js/chart.js"></script>
+    {% endif %}
+    <script src="/static/js/flatpickr"></script>
+    <script>
+        flatpickr("#date", {
+            enableTime: true,
+            dateFormat: "Z",
+            altInput: true,
+            noCalendar: false,
+            defaultDate: new Date().toISOString(),
+            time_24hr: false
+        });
+
+        const f = document.getElementById("submission");
+        f.addEventListener("submit", function(e) {
+            let ready = false;
+            e.preventDefault();
+            const inputs = f.getElementsByTagName('input');
+            for (let i = 0; i < inputs.length; i++) {
+                const input = inputs[i];
+                if (input.type === "number") {
+                    if (input.value > 0) {
+                        ready = true;
+                    }
+                }
+            }
+            if (ready) {
+                f.submit();
+            } else {
+                document.getElementById("errorMsg").innerHTML = "Values cannot all be 0";
+            };
+        });
+
+        {% if pullups %}
+
+        function cumulativeSum(arr) {
+            let result = [];
+            let sum = 0;
+            
+            for (let i = 0; i < arr.length; i++) {
+                sum += arr[i];
+                result.push(sum);
+            }
+            
+            return result;
+        }
+
+        document.getElementById("deleteData").addEventListener('click', function(a) {
+            a.target.parentElement.outerHTML = `...deleting<br /><img src=/static/pork.gif width=160px>`;
+            fetch("/delete")
+                .then((data) => {
+                    window.location.href = "/";
+                })
+        });
+
+        const cleanData = cumulativeSum([{% for pullup in pullups %}{{ pullup.clean }},{% endfor %}]);
+        const negData = cumulativeSum([{% for pullup in pullups %}{{ pullup.negative }},{% endfor %}]);
+        const pushData = cumulativeSum([{% for pullup in pullups %}{{ pullup.pushup }},{% endfor %}]);
+        const dates = [{% for pullup in pullups %}"{{ pullup.date }}",{% endfor %}];
+
+        // Labels for the x-axis (you can adjust these as needed)
+        const labels = cleanData.map((_, index) => `Point ${index + 1}`);
+
+        // Get the context of the canvas element we want to select
+        
+
+        function drawChart(id, title, data, coreColors) {
+            const ctx = document.getElementById(id).getContext("2d");
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: title,
+                        data: data,
+                        borderColor: `rgba(${coreColors}, 1)`,
+                        backgroundColor: `rgba(${coreColors}, .3)`,
+                        borderWidth: 1,
+                        fill: true
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        },
+                        x: {
+                            maxRotation: 90,
+                            minRotation: 45
+                        }
+                    }
+                }
+            });
+        }
+
+        drawChart("cleanChart", "Cleans", cleanData, "102, 46, 155");
+        drawChart("negChart", "Negatives", negData, "67, 188, 205");
+        drawChart("pushChart", "Pushups", pushData, "248, 102, 36");
+
+        {% else %}
+
+        document.getElementById("generateData").addEventListener('click', function(a) {
+            a.target.parentElement.outerHTML = `...generating<br /><img src=/static/pork.gif width=160px>`;
+            fetch("/generate")
+                .then((data) => {
+                    window.location.href = "/";
+                })
+        });
+
+        {% endif %}
+
+    </script>
+</body>
+</html>
